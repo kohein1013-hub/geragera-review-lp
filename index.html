@@ -593,6 +593,59 @@
     return out;
   }
 
+  // Geminiが429等で失敗した場合のための簡易フォールバック（疑似生成）
+  function getSelectedPointPhrasesFallback() {
+    var boxes = document.querySelectorAll('input[name="points"]:checked');
+    var labels = {
+      show: "お笑い・演出がとても楽しかったです",
+      staff: "スタッフの対応がよかったです",
+      drink: "ドリンク・フードがよかったです",
+      atmosphere: "店内の雰囲気がよかったです",
+      access: "梅田駅から行きやすかったです",
+      friends: "友人との利用にちょうどよかったです",
+      karaoke: "カラオケも楽しめました",
+      darts: "ダーツも楽しめました"
+    };
+    var out = [];
+    boxes.forEach(function (cb) {
+      if (labels[cb.value]) out.push(labels[cb.value]);
+    });
+    return out;
+  }
+
+  function buildDraftFallback() {
+    var sat = document.querySelector('input[name="satisfaction"]:checked');
+    if (!sat) return "";
+
+    var satNum = parseInt(sat.value, 10);
+    var phrases = getSelectedPointPhrasesFallback();
+    if (phrases.length === 0) phrases = ["全体的に楽しい時間を過ごせました"];
+
+    var intro;
+    if (satNum >= 4) {
+      intro = "大阪・梅田のおもしろBar「ゲラゲラ」に伺いました。とても楽しい時間でした。";
+    } else if (satNum === 3) {
+      intro = "大阪・梅田のおもしろBar「ゲラゲラ」を利用しました。全体としては「" + satisfactionLabel(sat.value) + "」という印象です。";
+    } else {
+      intro = "大阪・梅田のおもしろBar「ゲラゲラ」を利用しました。今回は「" + satisfactionLabel(sat.value) + "」でした。";
+    }
+
+    var body = phrases.join("。") + "。";
+    var tail =
+      "梅田でバーを探している方におすすめです。カラオケやダーツも楽しめるので、仕事帰りや週末の飲み会にもぴったりだと思います。";
+
+    if (satNum <= 2) {
+      return (
+        intro +
+        "\n\n" +
+        body +
+        "\n\n改善してほしい点は、可能であれば店舗へ直接お伝えいただくと、より良くなると思います。"
+      );
+    }
+
+    return intro + "\n\n" + body + "\n\n" + tail;
+  }
+
   async function generateDraftWithGemini() {
     var sat = document.querySelector('input[name="satisfaction"]:checked');
     if (!sat) return "";
@@ -610,7 +663,7 @@
       tone: "ですます調"
     };
 
-    var res = await fetch("/.netlify/functions/generate-review", {
+    var res = await fetch("/api/generate-review", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body)
@@ -631,7 +684,7 @@
           (t ? t.length : 0) +
           (bodyPreview ? "\n" + bodyPreview : "") +
           (status === 404
-            ? "\n\nヒント: Netlify Functionsが未デプロイ（またはDropにnetlify/functionsが含まれていない）可能性があります。"
+            ? "\n\nヒント: Vercelの API route /api/generate-review が未デプロイ（またはビルド/設定が反映されていない）可能性があります。"
             : "")
       );
     }
@@ -692,15 +745,20 @@
     }
     applyReviewLink();
     setStep(3);
-    draftText.value = "口コミ文を作成中です…";
+    // フォールバック先頭を「先に」出して、更新反映の確認を確実にします。
+    draftText.value = "（Geminiはクォータ超過のため簡易文で作成しました）\n口コミ文を作成中です…";
     generateDraftWithGemini()
       .then(function (text) {
-        draftText.value =
-          text || "（生成結果が空でした。少し時間をおいて再度お試しください）";
+        // Gemini成功時は生成文で上書きします。
+        draftText.value = text || "（生成結果が空でした。少し時間をおいて再度お試しください）";
       })
       .catch(function (err) {
         var msg = (err && err.message) ? err.message : String(err);
-        draftText.value = "（口コミ文の作成に失敗しました）\n" + msg;
+        var fallback = buildDraftFallback();
+        // フォールバックが動いたことが分かるように、先頭に明示ラベルを付けます。
+        if (!fallback) fallback = "（口コミ文を作成できませんでした。時間をおいて再度お試しください）";
+        draftText.value = "（Geminiはクォータ超過のため簡易文で作成しました）\n" + fallback;
+        draftText.value += "\n\n（詳細）" + msg;
         console.error(err);
       });
   });
