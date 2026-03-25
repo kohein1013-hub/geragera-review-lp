@@ -610,7 +610,7 @@
       tone: "ですます調"
     };
 
-    var res = await fetch("/api/generate-review", {
+    var res = await fetch("/.netlify/functions/generate-review", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body)
