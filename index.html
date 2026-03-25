@@ -758,7 +758,6 @@
         // フォールバックが動いたことが分かるように、先頭に明示ラベルを付けます。
         if (!fallback) fallback = "（口コミ文を作成できませんでした。時間をおいて再度お試しください）";
         draftText.value = "（Geminiはクォータ超過のため簡易文で作成しました）\n" + fallback;
-        draftText.value += "\n\n（詳細）" + msg;
         console.error(err);
       });
   });
