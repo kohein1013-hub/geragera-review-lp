@@ -745,8 +745,8 @@
     }
     applyReviewLink();
     setStep(3);
-    // フォールバック先頭を「先に」出して、更新反映の確認を確実にします。
-    draftText.value = "（Geminiはクォータ超過のため簡易文で作成しました）\n口コミ文を作成中です…";
+    // 生成中表示（Gemini失敗時はフォールバック文に置き換えます）
+    draftText.value = "口コミ文を作成中です…";
     generateDraftWithGemini()
       .then(function (text) {
         // Gemini成功時は生成文で上書きします。
@@ -757,7 +757,7 @@
         var fallback = buildDraftFallback();
         // フォールバックが動いたことが分かるように、先頭に明示ラベルを付けます。
         if (!fallback) fallback = "（口コミ文を作成できませんでした。時間をおいて再度お試しください）";
-        draftText.value = "（Geminiはクォータ超過のため簡易文で作成しました）\n" + fallback;
+        draftText.value = fallback;
         console.error(err);
       });
   });
